@@ -364,6 +364,28 @@ local function write_revision_file(buf, change_id, rel_path, force)
 end
 M.write_revision_file = write_revision_file
 
+local pending_lines
+
+--- Apply the lines staged by `set_lines_keeping_marks()` to the current buffer.
+--- Only reachable through the `:lockmarks` dispatch below.
+function M._flush_pending_lines()
+	local lines = pending_lines
+	pending_lines = nil
+	vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+end
+
+--- Replace a buffer's contents without shifting the positions recorded against
+--- it, quickfix and location list entries among them.
+--- @param buf number
+--- @param lines string[]
+local function set_lines_keeping_marks(buf, lines)
+	pending_lines = lines
+	-- `:lockmarks` has no API equivalent, and it acts on the current buffer.
+	vim.api.nvim_buf_call(buf, function()
+		vim.cmd("lockmarks lua require('jj.file')._flush_pending_lines()")
+	end)
+end
+
 --- Opens a target file revision in a new buffer.
 --- @param opts jj.file.open_target_opts
 function M.open_target(opts)
@@ -487,7 +509,7 @@ function M.register_command()
 			local buf = vim.api.nvim_get_current_buf()
 			M.set_buf_encoding(buf, used_enc)
 			vim.bo[buf].modifiable = true
-			vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+			set_lines_keeping_marks(buf, lines)
 			vim.bo[buf].eol = had_eol
 			vim.bo[buf].modified = false
 			vim.bo[buf].modifiable = not utils.is_change_immutable(change_id)
