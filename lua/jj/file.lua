@@ -408,7 +408,10 @@ end
 --- @param change_id string
 --- @param path string
 local function setup_revision_buffer(buf, change_id, path)
-	vim.bo[buf].buftype = "acwrite"
+	-- Not `acwrite`: quickfix and pickers only ever reuse a window showing a
+	-- buffer with an empty 'buftype', and split or hijack another window
+	-- otherwise. `BufWriteCmd` intercepts writes either way.
+	vim.bo[buf].buftype = ""
 	vim.bo[buf].swapfile = false
 	vim.bo[buf].buflisted = true
 	if vim.bo[buf].filetype == "" then
